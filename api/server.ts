@@ -13,7 +13,7 @@ interface SerializedRequest {
   headers: IncomingHttpHeaders;
 }
 
-const redis = await createClient({ url: process.env.REDIS_URL }).connect();
+const redisPromise = createClient({ url: process.env.REDIS_URL }).connect();
 
 let servers: Server[] = [];
 
@@ -21,6 +21,7 @@ export default async function handler(
   req: IncomingMessage,
   res: ServerResponse
 ) {
+  const redis = await redisPromise;
   const url = new URL(req.url || "", "https://example.com");
   if (url.pathname === "/sse") {
     console.log("Got new SSE connection");
