@@ -13,7 +13,11 @@ interface SerializedRequest {
   headers: IncomingHttpHeaders;
 }
 
-const redisPromise = createClient({ url: process.env.REDIS_URL }).connect();
+const redis = createClient({ url: process.env.REDIS_URL });
+const redisPromise = redis.connect();
+redis.on("error", (err) => {
+  console.error("Redis error", err);
+});
 
 let servers: Server[] = [];
 
@@ -21,7 +25,7 @@ export default async function handler(
   req: IncomingMessage,
   res: ServerResponse
 ) {
-  const redis = await redisPromise;
+  await redisPromise;
   const url = new URL(req.url || "", "https://example.com");
   if (url.pathname === "/sse") {
     console.log("Got new SSE connection");
@@ -45,8 +49,10 @@ export default async function handler(
       servers = servers.filter((s) => s !== server);
     };
 
-    redis.subscribe(`requests:${sessionId}`, async (message) => {
-      console.log("Received message from Redis", message);
+    let logs: string[] = [];
+
+    const handleMessage = async (message: string) => {
+      logs.push("Received message from Redis", message);
       const request = JSON.parse(message) as SerializedRequest;
 
       const req = createFakeIncomingMessage({
@@ -55,22 +61,22 @@ export default async function handler(
         headers: request.headers,
         body: request.body,
       });
-      const res = new ServerResponse(req);
+      const syntheticRes = new ServerResponse(req);
       let status = 100;
       let body = "";
-      res.writeHead = (statusCode) => {
+      syntheticRes.writeHead = (statusCode) => {
         status = statusCode;
-        return res;
+        return syntheticRes;
       };
-      res.end = () => {
-        return res;
+      syntheticRes.end = () => {
+        return syntheticRes;
       };
-      await transport.handlePostMessage(req, res);
+      await transport.handlePostMessage(req, syntheticRes);
 
       if (status >= 200 && status < 300) {
-        console.info(`Request ${sessionId} succeeded`);
+        logs.push(`Request ${sessionId} succeeded`);
       } else {
-        console.error(
+        logs.push(
           `Message for ${sessionId} failed with status ${status}: ${body}\n\n${JSON.stringify(
             req,
             null,
@@ -78,9 +84,30 @@ export default async function handler(
           )}`
         );
       }
+    };
+
+    const interval = setInterval(() => {
+      for (const log of logs) {
+        console.log(log);
+      }
+      logs = [];
+    }, 100);
+
+    await redis.subscribe(`requests:${sessionId}`, handleMessage);
+    console.log(`Subscribed to requests:${sessionId}`);
+
+    const timeout = new Promise((resolve) => {
+      setTimeout(() => {
+        resolve(undefined);
+      }, 795 * 1000);
     });
 
     await server.connect(transport);
+    await timeout;
+    redis.unsubscribe(`requests:${sessionId}`, handleMessage);
+    clearInterval(interval);
+    console.log("Done");
+    res.end();
   } else if (url.pathname === "/message") {
     console.log("Received message");
 
@@ -90,6 +117,11 @@ export default async function handler(
     });
 
     const sessionId = url.searchParams.get("sessionId") || "";
+    if (!sessionId) {
+      res.statusCode = 400;
+      res.end("No sessionId provided");
+      return;
+    }
 
     const serializedRequest: SerializedRequest = {
       url: req.url || "",
@@ -100,11 +132,11 @@ export default async function handler(
 
     // Queue the request in Redis so that a subscriber can pick it up.
     // One queue per session.
-    await redis.publish(
-      `requests:${sessionId}`,
-      JSON.stringify(serializedRequest)
-    );
-    await redis.expire(`requests:${sessionId}`, 1 * 60); // 1 minute
+    await Promise.all([
+      redis.publish(`requests:${sessionId}`, JSON.stringify(serializedRequest)),
+      redis.expire(`requests:${sessionId}`, 1 * 60), // 1 minute
+    ]);
+    console.log(`Published requests:${sessionId}`);
 
     res.statusCode = 202;
     res.end("Accepted");
