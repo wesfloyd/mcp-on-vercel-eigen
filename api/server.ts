@@ -50,9 +50,12 @@ export default async function handler(
     };
 
     let logs: string[] = [];
+    function logInContext(message: string) {
+      logs.push(message);
+    }
 
     const handleMessage = async (message: string) => {
-      logs.push("Received message from Redis", message);
+      logInContext("Received message from Redis", message);
       const request = JSON.parse(message) as SerializedRequest;
 
       const req = createFakeIncomingMessage({
@@ -68,20 +71,17 @@ export default async function handler(
         status = statusCode;
         return syntheticRes;
       };
-      syntheticRes.end = () => {
+      syntheticRes.end = (b) => {
+        body = b;
         return syntheticRes;
       };
       await transport.handlePostMessage(req, syntheticRes);
 
       if (status >= 200 && status < 300) {
-        logs.push(`Request ${sessionId} succeeded`);
+        logInContext(`Request ${sessionId} succeeded`);
       } else {
-        logs.push(
-          `Message for ${sessionId} failed with status ${status}: ${body}\n\n${JSON.stringify(
-            req,
-            null,
-            2
-          )}`
+        logInContext(
+          `Message for ${sessionId} failed with status ${status}: ${body}`
         );
       }
     };
