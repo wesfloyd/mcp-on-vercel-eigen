@@ -109,15 +109,21 @@ export function initializeMcpApiHandler(
               body,
             })
           ),
-          redisPublisher.expire(`responses:${sessionId}`, 60 * 60), // 1 hour
+          redisPublisher.expire(
+            `responses:${sessionId}:${request.requestId}`,
+            60 * 60
+          ), // 1 hour
         ]);
 
         if (status >= 200 && status < 300) {
-          logInContext("log", `Request ${sessionId} succeeded: ${body}`);
+          logInContext(
+            "log",
+            `Request ${sessionId}:${request.requestId} succeeded: ${body}`
+          );
         } else {
           logInContext(
             "error",
-            `Message for ${sessionId} failed with status ${status}: ${body}`
+            `Message for ${sessionId}:${request.requestId} failed with status ${status}: ${body}`
           );
         }
       };
