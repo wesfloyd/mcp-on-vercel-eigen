@@ -1,13 +1,18 @@
 # Run an MCP Server on Vercel
 
-## Sample POST
+## Usage
+
+Update `api/server.ts` with your tools, prompts, and resources following the [MSC TypeScript SDK documentation](https://github.com/modelcontextprotocol/typescript-sdk/tree/main?tab=readme-ov-file#server).
+
+## Notes for running on Vercel
+
+- Requires a Redis attached to the project under process.env.REDIS_URL
+- Make sure you have [Fluid compute](https://vercel.com/docs/functions/fluid-compute) enabled for efficient execution
+
+## Sample Client
+
+`script/test-client.mjs` contains a sample client to try invocations.
 
 ```sh
-curl -X POST "https://mcp-on-vercel.vercel.app/message?sessionId=3657fb33-19a4-4e05-bc33-3fd17d0fffe8" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "John Doe",
-    "email": "john@example.com",
-    "message": "Hello, world!"
-  }'
+node scripts/test-client.mjs https://mcp-on-vercel.vercel.app
 ```

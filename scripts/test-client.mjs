@@ -1,10 +1,10 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 
+const origin = process.argv[2] || "https://mcp-on-vercel.vercel.app";
+
 async function main() {
-  const transport = new SSEClientTransport(
-    new URL("https://mcp-on-vercel.vercel.app/sse")
-  );
+  const transport = new SSEClientTransport(new URL(`${origin}/sse`));
 
   const client = new Client(
     {
@@ -24,7 +24,7 @@ async function main() {
 
   console.log("Connected");
 
-  const result = await client.listPrompts();
+  const result = await client.listTools();
   console.log(result);
 }
 

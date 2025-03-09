@@ -16,17 +16,18 @@ interface SerializedRequest {
 
 const redis = createClient({ url: process.env.REDIS_URL });
 const redisPublisher = createClient({ url: process.env.REDIS_URL });
-const redisPromise = Promise.all([redis.connect(), redisPublisher.connect()]);
 redis.on("error", (err) => {
   console.error("Redis error", err);
 });
 redisPublisher.on("error", (err) => {
   console.error("Redis error", err);
 });
+const redisPromise = Promise.all([redis.connect(), redisPublisher.connect()]);
 
 let servers: McpServer[] = [];
 
-let requestId = 0;
+// Used for Redis-backed RPC between SSE client and message server.
+let nextRequestId = 0;
 
 export function initializeMcpApiHandler(
   initializeServer: (server: McpServer) => void
@@ -73,11 +74,13 @@ export function initializeMcpApiHandler(
         });
       }
 
+      // Handles messages originally received via /message
       const handleMessage = async (message: string) => {
         console.log("Received message from Redis", message);
         logInContext("log", "Received message from Redis", message);
         const request = JSON.parse(message) as SerializedRequest;
 
+        // Make in IncomingMessage object because that is what the SDK expects.
         const req = createFakeIncomingMessage({
           method: request.method,
           url: request.url,
@@ -87,24 +90,27 @@ export function initializeMcpApiHandler(
         const syntheticRes = new ServerResponse(req);
         let status = 100;
         let body = "";
-        syntheticRes.writeHead = (statusCode) => {
+        syntheticRes.writeHead = (statusCode: number) => {
           status = statusCode;
           return syntheticRes;
         };
-        syntheticRes.end = (b) => {
-          body = b;
+        syntheticRes.end = (b: unknown) => {
+          body = b as string;
           return syntheticRes;
         };
         await transport.handlePostMessage(req, syntheticRes);
 
-        await redisPublisher.publish(
-          `responses:${sessionId}:${request.requestId}`,
-          JSON.stringify({
-            status,
-            body,
-          })
-        );
-        await redisPublisher.expire(`responses:${sessionId}`, 60 * 60); // 1 hour
+        await Promise.all([
+          redisPublisher.publish(
+            `responses:${sessionId}:${request.requestId}`,
+            JSON.stringify({
+              status,
+              body,
+            })
+          ),
+          redisPublisher.expire(`responses:${sessionId}`, 60 * 60), // 1 hour
+        ]);
+
         if (status >= 200 && status < 300) {
           logInContext("log", `Request ${sessionId} succeeded: ${body}`);
         } else {
@@ -162,9 +168,9 @@ export function initializeMcpApiHandler(
         res.end("No sessionId provided");
         return;
       }
-      const myRequestId = requestId++;
+      const requestId = nextRequestId++;
       const serializedRequest: SerializedRequest = {
-        requestId: myRequestId,
+        requestId,
         url: req.url || "",
         method: req.method || "",
         body: body,
@@ -183,12 +189,13 @@ export function initializeMcpApiHandler(
       console.log(`Published requests:${sessionId}`, serializedRequest);
 
       let timeout = setTimeout(() => {
-        redis.unsubscribe(`responses:${sessionId}:${myRequestId}`);
+        redis.unsubscribe(`responses:${sessionId}:${requestId}`);
         res.statusCode = 408;
         res.end("Request timed out");
       }, 60 * 1000);
 
-      redis.subscribe(`responses:${sessionId}:${myRequestId}`, (message) => {
+      // Handles responses from the /sse endpoint.
+      redis.subscribe(`responses:${sessionId}:${requestId}`, (message) => {
         clearTimeout(timeout);
         const response = JSON.parse(message) as {
           status: number;
@@ -200,7 +207,7 @@ export function initializeMcpApiHandler(
 
       res.on("close", () => {
         clearTimeout(timeout);
-        redis.unsubscribe(`responses:${sessionId}:${myRequestId}`);
+        redis.unsubscribe(`responses:${sessionId}:${requestId}`);
       });
     } else if (url.pathname === "/") {
     } else if (url.pathname === "/") {
