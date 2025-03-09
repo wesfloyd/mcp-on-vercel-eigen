@@ -193,18 +193,21 @@ export function initializeMcpApiHandler(
         redis.unsubscribe(`responses:${sessionId}:${requestId}`);
         res.statusCode = 408;
         res.end("Request timed out");
-      }, 60 * 1000);
+      }, 10 * 1000);
 
       // Handles responses from the /sse endpoint.
-      redis.subscribe(`responses:${sessionId}:${requestId}`, (message) => {
-        clearTimeout(timeout);
-        const response = JSON.parse(message) as {
-          status: number;
-          body: string;
-        };
-        res.statusCode = response.status;
-        res.end(response.body);
-      });
+      await redis.subscribe(
+        `responses:${sessionId}:${requestId}`,
+        (message) => {
+          clearTimeout(timeout);
+          const response = JSON.parse(message) as {
+            status: number;
+            body: string;
+          };
+          res.statusCode = response.status;
+          res.end(response.body);
+        }
+      );
 
       res.on("close", () => {
         clearTimeout(timeout);
