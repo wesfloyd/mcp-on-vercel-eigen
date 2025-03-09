@@ -15,8 +15,12 @@ interface SerializedRequest {
 }
 
 const redis = createClient({ url: process.env.REDIS_URL });
-const redisPromise = redis.connect();
+const redisPublisher = createClient({ url: process.env.REDIS_URL });
+const redisPromise = Promise.all([redis.connect(), redisPublisher.connect()]);
 redis.on("error", (err) => {
+  console.error("Redis error", err);
+});
+redisPublisher.on("error", (err) => {
   console.error("Redis error", err);
 });
 
@@ -93,14 +97,14 @@ export function initializeMcpApiHandler(
         };
         await transport.handlePostMessage(req, syntheticRes);
 
-        await redis.publish(
+        await redisPublisher.publish(
           `responses:${sessionId}:${request.requestId}`,
           JSON.stringify({
             status,
             body,
           })
         );
-        await redis.expire(`responses:${sessionId}`, 60 * 60); // 1 hour
+        await redisPublisher.expire(`responses:${sessionId}`, 60 * 60); // 1 hour
         if (status >= 200 && status < 300) {
           logInContext("log", `Request ${sessionId} succeeded: ${body}`);
         } else {
