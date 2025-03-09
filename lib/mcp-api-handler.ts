@@ -178,13 +178,14 @@ export function initializeMcpApiHandler(
       ]);
       console.log(`Published requests:${sessionId}`, serializedRequest);
 
-      setTimeout(() => {
+      let timeout = setTimeout(() => {
         redis.unsubscribe(`responses:${sessionId}:${myRequestId}`);
         res.statusCode = 408;
         res.end("Request timed out");
       }, 60 * 1000);
 
       redis.subscribe(`responses:${sessionId}:${myRequestId}`, (message) => {
+        clearTimeout(timeout);
         const response = JSON.parse(message) as {
           status: number;
           body: string;
@@ -194,6 +195,7 @@ export function initializeMcpApiHandler(
       });
 
       res.on("close", () => {
+        clearTimeout(timeout);
         redis.unsubscribe(`responses:${sessionId}:${myRequestId}`);
       });
     } else if (url.pathname === "/") {
