@@ -91,7 +91,7 @@ export function initializeMcpApiHandler(
         await transport.handlePostMessage(req, syntheticRes);
 
         if (status >= 200 && status < 300) {
-          logInContext("log", `Request ${sessionId} succeeded`);
+          logInContext("log", `Request ${sessionId} succeeded: ${body}`);
         } else {
           logInContext(
             "error",
