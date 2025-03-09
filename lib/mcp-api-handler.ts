@@ -181,11 +181,11 @@ export function initializeMcpApiHandler(
       // Queue the request in Redis so that a subscriber can pick it up.
       // One queue per session.
       await Promise.all([
-        redis.publish(
+        redisPublisher.publish(
           `requests:${sessionId}`,
           JSON.stringify(serializedRequest)
         ),
-        redis.expire(`requests:${sessionId}`, 60 * 60), // 1 hour
+        redisPublisher.expire(`requests:${sessionId}`, 60 * 60), // 1 hour
       ]);
       console.log(`Published requests:${sessionId}`, serializedRequest);
 
