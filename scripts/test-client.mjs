@@ -22,7 +22,7 @@ async function main() {
 
   await client.connect(transport);
 
-  console.log("Connected");
+  console.log("Connected", client.getClientCapabilities());
 
   const result = await client.listTools();
   console.log(result);
