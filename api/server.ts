@@ -49,13 +49,22 @@ export default async function handler(
       servers = servers.filter((s) => s !== server);
     };
 
-    let logs: string[] = [];
-    function logInContext(message: string) {
-      logs.push(message);
+    let logs: {
+      type: "log" | "error";
+      messages: string[];
+    }[] = [];
+    // This ensures that we logs in the context of the right invocation since the subscriber
+    // is not itself invoked in request context.
+    function logInContext(severity: "log" | "error", ...messages: string[]) {
+      logs.push({
+        type: severity,
+        messages,
+      });
     }
 
     const handleMessage = async (message: string) => {
-      logInContext("Received message from Redis", message);
+      console.log("Received message from Redis", message);
+      logInContext("log", "Received message from Redis", message);
       const request = JSON.parse(message) as SerializedRequest;
 
       const req = createFakeIncomingMessage({
@@ -78,9 +87,10 @@ export default async function handler(
       await transport.handlePostMessage(req, syntheticRes);
 
       if (status >= 200 && status < 300) {
-        logInContext(`Request ${sessionId} succeeded`);
+        logInContext("log", `Request ${sessionId} succeeded`);
       } else {
         logInContext(
+          "error",
           `Message for ${sessionId} failed with status ${status}: ${body}`
         );
       }
@@ -88,7 +98,7 @@ export default async function handler(
 
     const interval = setInterval(() => {
       for (const log of logs) {
-        console.log(log);
+        console[log.type].call(console, ...log.messages);
       }
       logs = [];
     }, 100);
