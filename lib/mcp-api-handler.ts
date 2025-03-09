@@ -178,20 +178,6 @@ export function initializeMcpApiHandler(
         headers: req.headers,
       };
 
-      // Queue the request in Redis so that a subscriber can pick it up.
-      // One queue per session.
-      await redisPublisher.publish(
-        `requests:${sessionId}`,
-        JSON.stringify(serializedRequest)
-      );
-      console.log(`Published requests:${sessionId}`, serializedRequest);
-
-      let timeout = setTimeout(async () => {
-        await redis.unsubscribe(`responses:${sessionId}:${requestId}`);
-        res.statusCode = 408;
-        res.end("Request timed out");
-      }, 10 * 1000);
-
       // Handles responses from the /sse endpoint.
       await redis.subscribe(
         `responses:${sessionId}:${requestId}`,
@@ -205,6 +191,20 @@ export function initializeMcpApiHandler(
           res.end(response.body);
         }
       );
+
+      // Queue the request in Redis so that a subscriber can pick it up.
+      // One queue per session.
+      await redisPublisher.publish(
+        `requests:${sessionId}`,
+        JSON.stringify(serializedRequest)
+      );
+      console.log(`Published requests:${sessionId}`, serializedRequest);
+
+      let timeout = setTimeout(async () => {
+        await redis.unsubscribe(`responses:${sessionId}:${requestId}`);
+        res.statusCode = 408;
+        res.end("Request timed out");
+      }, 10 * 1000);
 
       res.on("close", async () => {
         clearTimeout(timeout);
