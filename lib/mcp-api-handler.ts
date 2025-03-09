@@ -101,19 +101,13 @@ export function initializeMcpApiHandler(
         };
         await transport.handlePostMessage(req, syntheticRes);
 
-        await Promise.all([
-          redisPublisher.publish(
-            `responses:${sessionId}:${request.requestId}`,
-            JSON.stringify({
-              status,
-              body,
-            })
-          ),
-          redisPublisher.expire(
-            `responses:${sessionId}:${request.requestId}`,
-            60 * 60
-          ), // 1 hour
-        ]);
+        await redisPublisher.publish(
+          `responses:${sessionId}:${request.requestId}`,
+          JSON.stringify({
+            status,
+            body,
+          })
+        );
 
         if (status >= 200 && status < 300) {
           logInContext(
@@ -186,17 +180,14 @@ export function initializeMcpApiHandler(
 
       // Queue the request in Redis so that a subscriber can pick it up.
       // One queue per session.
-      await Promise.all([
-        redisPublisher.publish(
-          `requests:${sessionId}`,
-          JSON.stringify(serializedRequest)
-        ),
-        redisPublisher.expire(`requests:${sessionId}`, 60 * 60), // 1 hour
-      ]);
+      await redisPublisher.publish(
+        `requests:${sessionId}`,
+        JSON.stringify(serializedRequest)
+      );
       console.log(`Published requests:${sessionId}`, serializedRequest);
 
-      let timeout = setTimeout(() => {
-        redis.unsubscribe(`responses:${sessionId}:${requestId}`);
+      let timeout = setTimeout(async () => {
+        await redis.unsubscribe(`responses:${sessionId}:${requestId}`);
         res.statusCode = 408;
         res.end("Request timed out");
       }, 10 * 1000);
@@ -215,9 +206,9 @@ export function initializeMcpApiHandler(
         }
       );
 
-      res.on("close", () => {
+      res.on("close", async () => {
         clearTimeout(timeout);
-        redis.unsubscribe(`responses:${sessionId}:${requestId}`);
+        await redis.unsubscribe(`responses:${sessionId}:${requestId}`);
       });
     } else if (url.pathname === "/") {
     } else if (url.pathname === "/") {
