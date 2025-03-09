@@ -8,7 +8,7 @@ Update `api/server.ts` with your tools, prompts, and resources following the [MC
 
 - Requires a Redis attached to the project under process.env.REDIS_URL
 - Make sure you have [Fluid compute](https://vercel.com/docs/functions/fluid-compute) enabled for efficient execution
-- After enabling Fluid compute, open `vercel.json` and adjust max duration to 800
+- After enabling Fluid compute, open `vercel.json` and adjust max duration to 800 if you using a Vercel Pro or Enterprise account
 - [Deploy the MCP template](https://vercel.com/templates/other/model-context-protocol-mcp-with-vercel-functions)
 
 ## Sample Client
