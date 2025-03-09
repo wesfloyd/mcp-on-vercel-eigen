@@ -2,7 +2,7 @@
 
 ## Usage
 
-Update `api/server.ts` with your tools, prompts, and resources following the [MSC TypeScript SDK documentation](https://github.com/modelcontextprotocol/typescript-sdk/tree/main?tab=readme-ov-file#server).
+Update `api/server.ts` with your tools, prompts, and resources following the [MCP TypeScript SDK documentation](https://github.com/modelcontextprotocol/typescript-sdk/tree/main?tab=readme-ov-file#server).
 
 ## Notes for running on Vercel
 
