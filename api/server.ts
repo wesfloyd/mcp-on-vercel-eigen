@@ -1,13 +1,9 @@
+import { z } from "zod";
 import { initializeMcpApiHandler } from "../lib/mcp-api-handler";
 
 const handler = initializeMcpApiHandler((server) => {
-  server.resource("config", "config://app", async (uri) => ({
-    contents: [
-      {
-        uri: uri.href,
-        text: "We are running on Vercel",
-      },
-    ],
+  server.tool("echo", { message: z.string() }, async ({ message }) => ({
+    content: [{ type: "text", text: `Tool echo: ${message}` }],
   }));
 });
 

@@ -24,7 +24,7 @@ async function main() {
 
   console.log("Connected");
 
-  const result = await client.request("config", "config://app");
+  const result = await client.listPrompts();
   console.log(result);
 }
 

@@ -7,6 +7,7 @@ import { Socket } from "net";
 import { Readable } from "stream";
 
 interface SerializedRequest {
+  requestId: number;
   url: string;
   method: string;
   body: string;
@@ -20,6 +21,8 @@ redis.on("error", (err) => {
 });
 
 let servers: McpServer[] = [];
+
+let requestId = 0;
 
 export function initializeMcpApiHandler(
   initializeServer: (server: McpServer) => void
@@ -90,6 +93,14 @@ export function initializeMcpApiHandler(
         };
         await transport.handlePostMessage(req, syntheticRes);
 
+        await redis.publish(
+          `responses:${sessionId}:${request.requestId}`,
+          JSON.stringify({
+            status,
+            body,
+          })
+        );
+        await redis.expire(`responses:${sessionId}`, 60 * 60); // 1 hour
         if (status >= 200 && status < 300) {
           logInContext("log", `Request ${sessionId} succeeded: ${body}`);
         } else {
@@ -147,8 +158,9 @@ export function initializeMcpApiHandler(
         res.end("No sessionId provided");
         return;
       }
-
+      const myRequestId = requestId++;
       const serializedRequest: SerializedRequest = {
+        requestId: myRequestId,
         url: req.url || "",
         method: req.method || "",
         body: body,
@@ -166,8 +178,25 @@ export function initializeMcpApiHandler(
       ]);
       console.log(`Published requests:${sessionId}`, serializedRequest);
 
-      res.statusCode = 202;
-      res.end("Accepted");
+      setTimeout(() => {
+        redis.unsubscribe(`responses:${sessionId}:${myRequestId}`);
+        res.statusCode = 408;
+        res.end("Request timed out");
+      }, 60 * 1000);
+
+      redis.subscribe(`responses:${sessionId}:${myRequestId}`, (message) => {
+        const response = JSON.parse(message) as {
+          status: number;
+          body: string;
+        };
+        res.statusCode = response.status;
+        res.end(response.body);
+      });
+
+      res.on("close", () => {
+        redis.unsubscribe(`responses:${sessionId}:${myRequestId}`);
+      });
+    } else if (url.pathname === "/") {
     } else if (url.pathname === "/") {
       res.statusCode = 200;
       res.end("Hello, world!");
