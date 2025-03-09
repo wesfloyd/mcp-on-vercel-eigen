@@ -93,6 +93,7 @@ export function initializeMcpApiHandler(
         };
         await transport.handlePostMessage(req, syntheticRes);
 
+        await redis.connect();
         await redis.publish(
           `responses:${sessionId}:${request.requestId}`,
           JSON.stringify({
