@@ -1,6 +1,6 @@
 import { initializeMcpApiHandler } from "../lib/mcp-api-handler";
 
-export const handler = initializeMcpApiHandler((server) => {
+const handler = initializeMcpApiHandler((server) => {
   server.resource("config", "config://app", async (uri) => ({
     contents: [
       {
@@ -10,3 +10,5 @@ export const handler = initializeMcpApiHandler((server) => {
     ],
   }));
 });
+
+export default handler;
