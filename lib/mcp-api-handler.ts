@@ -5,9 +5,10 @@ import { IncomingHttpHeaders, IncomingMessage, ServerResponse } from "http";
 import { createClient } from "redis";
 import { Socket } from "net";
 import { Readable } from "stream";
+import { ServerOptions } from "@modelcontextprotocol/sdk/server/index.js";
 
 interface SerializedRequest {
-  requestId: number;
+  requestId: string;
   url: string;
   method: string;
   body: string;
@@ -26,11 +27,9 @@ const redisPromise = Promise.all([redis.connect(), redisPublisher.connect()]);
 
 let servers: McpServer[] = [];
 
-// Used for Redis-backed RPC between SSE client and message server.
-let nextRequestId = 0;
-
 export function initializeMcpApiHandler(
-  initializeServer: (server: McpServer) => void
+  initializeServer: (server: McpServer) => void,
+  serverOptions: ServerOptions = {}
 ) {
   return async function mcpApiHandler(
     req: IncomingMessage,
@@ -45,12 +44,10 @@ export function initializeMcpApiHandler(
       const sessionId = transport.sessionId;
       const server = new McpServer(
         {
-          name: "mcp-typescript test server on vercel",
+          name: "mcp-typescript server on vercel",
           version: "0.1.0",
         },
-        {
-          capabilities: {},
-        }
+        serverOptions
       );
       initializeServer(server);
 
@@ -168,7 +165,7 @@ export function initializeMcpApiHandler(
         res.end("No sessionId provided");
         return;
       }
-      const requestId = nextRequestId++;
+      const requestId = crypto.randomUUID();
       const serializedRequest: SerializedRequest = {
         requestId,
         url: req.url || "",
