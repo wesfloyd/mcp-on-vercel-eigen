@@ -164,7 +164,7 @@ export function initializeMcpApiHandler(
         ),
         redis.expire(`requests:${sessionId}`, 60 * 60), // 1 hour
       ]);
-      console.log(`Published requests:${sessionId}`);
+      console.log(`Published requests:${sessionId}`, serializedRequest);
 
       res.statusCode = 202;
       res.end("Accepted");
