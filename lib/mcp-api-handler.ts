@@ -15,8 +15,12 @@ interface SerializedRequest {
   headers: IncomingHttpHeaders;
 }
 
-const redis = createClient({ url: process.env.REDIS_URL });
-const redisPublisher = createClient({ url: process.env.REDIS_URL });
+const redis = createClient({
+  url: process.env.REDIS_URL || process.env.KV_URL,
+});
+const redisPublisher = createClient({
+  url: process.env.REDIS_URL || process.env.KV_URL,
+});
 redis.on("error", (err) => {
   console.error("Redis error", err);
 });
