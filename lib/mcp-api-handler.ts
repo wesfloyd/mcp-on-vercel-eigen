@@ -15,26 +15,30 @@ interface SerializedRequest {
   headers: IncomingHttpHeaders;
 }
 
-const redis = createClient({
-  url: process.env.REDIS_URL || process.env.KV_URL,
-});
-const redisPublisher = createClient({
-  url: process.env.REDIS_URL || process.env.KV_URL,
-});
-redis.on("error", (err) => {
-  console.error("Redis error", err);
-});
-redisPublisher.on("error", (err) => {
-  console.error("Redis error", err);
-});
-const redisPromise = Promise.all([redis.connect(), redisPublisher.connect()]);
-
-let servers: McpServer[] = [];
-
 export function initializeMcpApiHandler(
   initializeServer: (server: McpServer) => void,
   serverOptions: ServerOptions = {}
 ) {
+  const redisUrl = process.env.REDIS_URL || process.env.KV_URL;
+  if (!redisUrl) {
+    throw new Error("REDIS_URL environment variable is not set");
+  }
+  const redis = createClient({
+    url: redisUrl,
+  });
+  const redisPublisher = createClient({
+    url: redisUrl,
+  });
+  redis.on("error", (err) => {
+    console.error("Redis error", err);
+  });
+  redisPublisher.on("error", (err) => {
+    console.error("Redis error", err);
+  });
+  const redisPromise = Promise.all([redis.connect(), redisPublisher.connect()]);
+
+  let servers: McpServer[] = [];
+
   return async function mcpApiHandler(
     req: IncomingMessage,
     res: ServerResponse
